@@ -34,10 +34,11 @@
 class LabjackClass{
 
  public:
-  LabjackClass();
+  LabjackClass(int num_ch, int samples);
   ~LabjackClass();
-  int ConfigIO_example();
-  int StreamConfig();
+  int ConfigIO();
+  int StreamConfig(uint16 scanInterval, uint8 ResolutionIndex, 
+		   uint8 SettlingFactor, uint8 ScanConfig);
   int StreamStart();
   int InitStreamData();
   int StreamData();
@@ -46,9 +47,9 @@ class LabjackClass{
   int PrintBuffer();
    
  private:
-  const uint8 NumChannels_;        //For this example to work proper, SamplesPerPacket needs
+  uint8 NumChannels_;        //For this example to work proper, SamplesPerPacket needs
                                    //to be a multiple of NumChannels.
-  const uint8 SamplesPerPacket_;   //Needs to be 25 to read multiple StreamData responses
+  uint8 SamplesPerPacket_;   //Needs to be 25 to read multiple StreamData responses
                                    //in one large packet, otherwise can be any value between
                                    //1-25 for 1 StreamData response per packet.
 

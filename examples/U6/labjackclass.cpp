@@ -25,15 +25,26 @@
 
 using namespace std;
 
-LabjackClass::LabjackClass():NumChannels_ (25),      
-			     SamplesPerPacket_ (25)
+LabjackClass::LabjackClass(int num_ch, int samples)
 {
+
+  if( ( num_ch < 1 ) || (num_ch > 25) )
+    {
+      cout << "Wrong number of channels, must be 1-25." << endl;
+      exit(0);
+    }
+  else
+    NumChannels_  = num_ch;
+  if( ( samples < 1 ) || (samples > 25) )
+    {
+      cout << "Wrong number of SamplesPerPack, must be 1-25 (1 low latency, 25 high speed)." << endl;
+      exit(0);
+    }
+  else
+    SamplesPerPacket_ = samples;
 
   packetCounter_ = 0;
   totalPackets_ = 0;
-
-  //HANDLE hDevice;
-  //u6CalibrationInfo caliInfo;
 
   //Opening first found U6 over USB
   if( (hDevice_ = openUSBConnection(-1)) == NULL )
@@ -51,19 +62,8 @@ LabjackClass::LabjackClass():NumChannels_ (25),
       exit(0);
     }
 
-
-  /*
-  if( ConfigIO_example() != 0 )
-    {
-      cout << "Error in ConfigIO_example." << endl;
-      exit(0);
-    }
-  */
-
   //Stopping any previous streams
   StreamStop();
-  
-  
 
             
 }          
@@ -77,243 +77,159 @@ LabjackClass::~LabjackClass()
 }             
                         
 
-//Sends a ConfigIO low-level command to turn off timers/counters
-int LabjackClass::ConfigIO_example()
-{
-    uint8 sendBuff[16], recBuff[16];
-    uint16 checksumTotal;
-    int sendChars, recChars, i;
 
-    sendBuff[1] = (uint8)(0xF8);  //Command byte
-    sendBuff[2] = (uint8)(0x03);  //Number of data words
-    sendBuff[3] = (uint8)(0x0B);  //Extended command number
-
-    sendBuff[6] = 1;  //Writemask : Setting writemask for TimerCounterConfig (bit 0)
-
-    sendBuff[7] = 0;  //NumberTimersEnabled : Setting to zero to disable all timers.
-    sendBuff[8] = 0;  //CounterEnable: Setting bit 0 and bit 1 to zero to disable both counters
-    sendBuff[9] = 0;  //TimerCounterPinOffset
-
-    for( i = 10; i < 16; i++ )
-        sendBuff[i] = 0;   //Reserved
-    extendedChecksum(sendBuff, 16);
-
-    //Sending command to U6
-    if( (sendChars = LJUSB_Write(hDevice_, sendBuff, 16)) < 16 )
-    {
-        if( sendChars == 0 )
-            printf("ConfigIO error : write failed\n");
-        else
-            printf("ConfigIO error : did not write all of the buffer\n");
-        return -1;
-    }
-
-    //Reading response from U6
-    if( (recChars = LJUSB_Read(hDevice_, recBuff, 16)) < 16 )
-    {
-        if( recChars == 0 )
-            printf("ConfigIO error : read failed\n");
-        else
-            printf("ConfigIO error : did not read all of the buffer\n");
-        return -1;
-    }
-
-    checksumTotal = extendedChecksum16(recBuff, 15);
-    if( (uint8)((checksumTotal / 256 ) & 0xff) != recBuff[5] )
-    {
-        printf("ConfigIO error : read buffer has bad checksum16(MSB)\n");
-        return -1;
-    }
-
-    if( (uint8)(checksumTotal & 0xff) != recBuff[4] )
-    {
-        printf("ConfigIO error : read buffer has bad checksum16(LSB)\n");
-        return -1;
-    }
-
-    if( extendedChecksum8(recBuff) != recBuff[0] )
-    {
-        printf("ConfigIO error : read buffer has bad checksum8\n");
-        return -1;
-    }
-
-    if( recBuff[1] != (uint8)(0xF8) || recBuff[2] != (uint8)(0x05) || recBuff[3] != (uint8)(0x0B) )
-    {
-        printf("ConfigIO error : read buffer has wrong command bytes\n");
-        return -1;
-    }
-
-    if( recBuff[6] != 0 )
-    {
-        printf("ConfigIO error : read buffer received errorcode %d\n", recBuff[6]);
-        return -1;
-    }
-
-    if( recBuff[8] != 0 )
-    {
-        printf("ConfigIO error : NumberTimersEnabled was not set to 0\n");
-        return -1;
-    }
-
-    if( recBuff[9] != 0 )
-    {
-        printf("ConfigIO error : CounterEnable was not set to 0\n");
-        return -1;
-    }
-
-    return 0;
-}
 
 //Sends a StreamConfig low-level command to configure the stream.
-int LabjackClass::StreamConfig()
+int LabjackClass::StreamConfig(uint16 scanInterval, uint8 ResolutionIndex, 
+			       uint8 SettlingFactor, uint8 ScanConfig)
 {
-    int sendBuffSize;
-    sendBuffSize = 14+NumChannels_*2;
-    uint8 sendBuff[sendBuffSize], recBuff[8];
-    int sendChars, recChars;
-    uint16 checksumTotal;
-    uint16 scanInterval;
-    int i;
+  int sendBuffSize;
+  sendBuffSize = 14+NumChannels_*2;
+  uint8 sendBuff[sendBuffSize], recBuff[8];
+  int sendChars, recChars;
+  uint16 checksumTotal;
+  //uint16 scanInterval;
+  int i;
 
-    sendBuff[1] = (uint8)(0xF8);     //Command byte
-    sendBuff[2] = 4 + NumChannels_;   //Number of data words = NumChannels_ + 4
-    sendBuff[3] = (uint8)(0x11);     //Extended command number
-    sendBuff[6] = NumChannels_;       //NumChannels_
-    sendBuff[7] = 1;                 //ResolutionIndex
-    sendBuff[8] = SamplesPerPacket_;  //SamplesPerPacket_
-    sendBuff[9] = 0;                 //Reserved
-    sendBuff[10] = 0;                //SettlingFactor: 0
-    sendBuff[11] = 0;  //ScanConfig:
-                       //  Bit 3: Internal stream clock frequency = b0: 4 MHz
-                       //  Bit 1: Divide Clock by 256 = b0
+  sendBuff[1] = (uint8)(0xF8);     //Command byte
+  sendBuff[2] = 4 + NumChannels_;  //Number of data words = NumChannels_ + 4
+  sendBuff[3] = (uint8)(0x11);     //Extended command number
+  sendBuff[6] = NumChannels_;      //NumChannels_ (1-25)
+  sendBuff[7] = ResolutionIndex;   //ResolutionIndex
+  sendBuff[8] = SamplesPerPacket_; //SamplesPerPacket_
+  sendBuff[9] = 0;                 //Reserved
+  sendBuff[10] = SettlingFactor;   //SettlingFactor: 0
+  sendBuff[11] = ScanConfig;       //ScanConfig:
+                                   //  Bit 3: Internal stream clock frequency = b0: 4 MHz
+                                   //  Bit 1: Divide Clock by 256 = b0
 
-    scanInterval = 4000;
-    sendBuff[12] = (uint8)(scanInterval&(0x00FF));  //scan interval (low byte)
-    sendBuff[13] = (uint8)(scanInterval/256);       //scan interval (high byte)
+  //scanInterval = 4000;
+  sendBuff[12] = (uint8)(scanInterval&(0x00FF));  //scan interval (low byte)
+  sendBuff[13] = (uint8)(scanInterval/256);       //scan interval (high byte)
 
-    for( i = 0; i < NumChannels_; i++ )
+  for( i = 0; i < NumChannels_; i++ )
     {
-        sendBuff[14 + i*2] = i;  //ChannelNumber (Positive) = i
-        sendBuff[15 + i*2] = 0;  //ChannelOptions: 
-                                 //  Bit 7: Differential = 0
-                                 //  Bit 5-4: GainIndex = 0 (+-10V)
+      sendBuff[14 + i*2] = i;  //ChannelNumber (Positive) = i
+      sendBuff[15 + i*2] = 0;  //ChannelOptions: 
+      //  Bit 7: Differential = 0
+      //  Bit 5-4: GainIndex = 0 (+-10V)
     }
 
-    extendedChecksum(sendBuff, sendBuffSize);
+  extendedChecksum(sendBuff, sendBuffSize);
 
-    //Sending command to U6
-    sendChars = LJUSB_Write(hDevice_, sendBuff, sendBuffSize);
-    if( sendChars < sendBuffSize )
+  //Sending command to U6
+  sendChars = LJUSB_Write(hDevice_, sendBuff, sendBuffSize);
+  if( sendChars < sendBuffSize )
     {
-        if( sendChars == 0 )
-            printf("Error : write failed (StreamConfig).\n");
-        else
-            printf("Error : did not write all of the buffer (StreamConfig).\n");
-        return -1;
+      if( sendChars == 0 )
+	printf("Error : write failed (StreamConfig).\n");
+      else
+	printf("Error : did not write all of the buffer (StreamConfig).\n");
+      return -1;
     }
 
-    for( i = 0; i < 8; i++ )
-        recBuff[i] = 0;
+  for( i = 0; i < 8; i++ )
+    recBuff[i] = 0;
 
-    //Reading response from U6
-    recChars = LJUSB_Read(hDevice_, recBuff, 8);
-    if( recChars < 8 )
+  //Reading response from U6
+  recChars = LJUSB_Read(hDevice_, recBuff, 8);
+  if( recChars < 8 )
     {
-        if( recChars == 0 )
-            printf("Error : read failed (StreamConfig).\n");
-        else
-            printf("Error : did not read all of the buffer, %d (StreamConfig).\n", recChars);
+      if( recChars == 0 )
+	printf("Error : read failed (StreamConfig).\n");
+      else
+	printf("Error : did not read all of the buffer, %d (StreamConfig).\n", recChars);
 
-        for( i = 0; i < 8; i++)
-            printf("%d ", recBuff[i]);
+      for( i = 0; i < 8; i++)
+	printf("%d ", recBuff[i]);
 
-        return -1;
+      return -1;
     }
 
-    checksumTotal = extendedChecksum16(recBuff, 8);
-    if( (uint8)((checksumTotal / 256) & 0xff) != recBuff[5])
+  checksumTotal = extendedChecksum16(recBuff, 8);
+  if( (uint8)((checksumTotal / 256) & 0xff) != recBuff[5])
     {
-        printf("Error : read buffer has bad checksum16(MSB) (StreamConfig).\n");
-        return -1;
+      printf("Error : read buffer has bad checksum16(MSB) (StreamConfig).\n");
+      return -1;
     }
 
-    if( (uint8)(checksumTotal & 0xff) != recBuff[4] )
+  if( (uint8)(checksumTotal & 0xff) != recBuff[4] )
     {
-        printf("Error : read buffer has bad checksum16(LSB) (StreamConfig).\n");
-        return -1;
+      printf("Error : read buffer has bad checksum16(LSB) (StreamConfig).\n");
+      return -1;
     }
 
-    if( extendedChecksum8(recBuff) != recBuff[0] )
+  if( extendedChecksum8(recBuff) != recBuff[0] )
     {
-        printf("Error : read buffer has bad checksum8 (StreamConfig).\n");
-        return -1;
+      printf("Error : read buffer has bad checksum8 (StreamConfig).\n");
+      return -1;
     }
 
-    if( recBuff[1] != (uint8)(0xF8) || recBuff[2] != (uint8)(0x01) || recBuff[3] != (uint8)(0x11) || recBuff[7] != (uint8)(0x00) )
+  if( recBuff[1] != (uint8)(0xF8) || recBuff[2] != (uint8)(0x01) || recBuff[3] != (uint8)(0x11) || recBuff[7] != (uint8)(0x00) )
     {
-        printf("Error : read buffer has wrong command bytes (StreamConfig).\n");
-        return -1;
+      printf("Error : read buffer has wrong command bytes (StreamConfig).\n");
+      return -1;
     }
 
-    if( recBuff[6] != 0 )
+  if( recBuff[6] != 0 )
     {
-        printf("Errorcode # %d from StreamConfig read.\n", (unsigned int)recBuff[6]);
-        return -1;
+      printf("Errorcode # %d from StreamConfig read.\n", (unsigned int)recBuff[6]);
+      return -1;
     }
 
-    return 0;
+  return 0;
 }
 
 //Sends a StreamStart low-level command to start streaming.
 int LabjackClass::StreamStart()
 {
-    uint8 sendBuff[2], recBuff[4];
-    int sendChars, recChars;
+  uint8 sendBuff[2], recBuff[4];
+  int sendChars, recChars;
 
-    sendBuff[0] = (uint8)(0xA8);  //Checksum8
-    sendBuff[1] = (uint8)(0xA8);  //Command byte
+  sendBuff[0] = (uint8)(0xA8);  //Checksum8
+  sendBuff[1] = (uint8)(0xA8);  //Command byte
 
-    //Sending command to U6
-    sendChars = LJUSB_Write(hDevice_, sendBuff, 2);
-    if( sendChars < 2 )
+  //Sending command to U6
+  sendChars = LJUSB_Write(hDevice_, sendBuff, 2);
+  if( sendChars < 2 )
     {
-        if( sendChars == 0 )
-            printf("Error : write failed.\n");
-        else
-            printf("Error : did not write all of the buffer.\n");
-        return -1;
+      if( sendChars == 0 )
+	printf("Error : write failed.\n");
+      else
+	printf("Error : did not write all of the buffer.\n");
+      return -1;
     }
 
-    //Reading response from U6
-    recChars = LJUSB_Read(hDevice_, recBuff, 4);
-    if( recChars < 4 )
+  //Reading response from U6
+  recChars = LJUSB_Read(hDevice_, recBuff, 4);
+  if( recChars < 4 )
     {
-        if( recChars == 0 )
-            printf("Error : read failed.\n");
-        else
-            printf("Error : did not read all of the buffer.\n");
-        return -1;
+      if( recChars == 0 )
+	printf("Error : read failed.\n");
+      else
+	printf("Error : did not read all of the buffer.\n");
+      return -1;
     }
 
-    if( normalChecksum8(recBuff, 4) != recBuff[0] )
+  if( normalChecksum8(recBuff, 4) != recBuff[0] )
     {
-        printf("Error : read buffer has bad checksum8 (StreamStart).\n");
-        return -1;
+      printf("Error : read buffer has bad checksum8 (StreamStart).\n");
+      return -1;
     }
 
-    if( recBuff[1] != (uint8)(0xA9) || recBuff[3] != (uint8)(0x00) )
+  if( recBuff[1] != (uint8)(0xA9) || recBuff[3] != (uint8)(0x00) )
     {
-        printf("Error : read buffer has wrong command bytes \n");
-        return -1;
+      printf("Error : read buffer has wrong command bytes \n");
+      return -1;
     }
 
-    if( recBuff[2] != 0 )
+  if( recBuff[2] != 0 )
     {
-        printf("Errorcode # %d from StreamStart read.\n", (unsigned int)recBuff[2]);
-        return -1;
+      printf("Errorcode # %d from StreamStart read.\n", (unsigned int)recBuff[2]);
+      return -1;
     }
 
-    return 0;
+  return 0;
 }
 
 int LabjackClass::InitStreamData()
@@ -322,14 +238,22 @@ int LabjackClass::InitStreamData()
   recBuffSize_ = 14 + SamplesPerPacket_*2;
   //numDisplay = 1; //6;
   //numReadsPerDisplay = 1;//24;
+
+  /* For USB StreamData, use Endpoint 3 for reads.  You can read the multiple
+   * StreamData responses of 64 bytes only if SamplesPerPacket_ is 25 to help
+   * improve streaming performance.  In this example this multiple is adjusted
+   * by the readSizeMultiplier variable.
+   */
   readSizeMultiplier_ = 5;
+
+
   responseSize_ = 14 + SamplesPerPacket_*2;
   scanNumber_ = 0;
   totalScanNumber_=0;
 
-  bufferSize_ =  2;
+  bufferSize_ =  1;
   //double voltages[(SamplesPerPacket_/NumChannels_)*readSizeMultiplier*numReadsPerDisplay*numDisplay][NumChannels_];
-  int stream_data_response_size = (SamplesPerPacket_/NumChannels_)*readSizeMultiplier_*bufferSize_; //*numReadsPerDisplay*numDisplay;
+  int stream_data_response_size = (SamplesPerPacket_/NumChannels_)*readSizeMultiplier_; //*numReadsPerDisplay*numDisplay;
   //std::vector< std::vector<double> > 
   //voltages_(stream_data_response_size, std::vector<double> (NumChannels_));
   //voltages_.get_allocator().allocate(, std::vector<double> (NumChannels_));
@@ -348,19 +272,19 @@ int LabjackClass::StreamData() //u6CalibrationInfo *caliInfo)
 
   int i, j, k, m;
   /*
-  int recBuffSize;
-  //  int packetCounter;
+    int recBuffSize;
+    //  int packetCounter;
 
-  //int totalPackets;  //The total number of StreamData responses read
-  uint16 voltageBytes, checksumTotal;
-  long startTime, endTime;
-  int autoRecoveryOn;
+    //int totalPackets;  //The total number of StreamData responses read
+    uint16 voltageBytes, checksumTotal;
+    long startTime, endTime;
+    int autoRecoveryOn;
 
-  //int numDisplay;          //Number of times to display streaming information
-  //int numReadsPerDisplay;  //Number of packets to read before displaying streaming information
-  int readSizeMultiplier;  //Multiplier for the StreamData receive buffer size
-  int responseSize;        //The number of bytes in a StreamData response (differs with SamplesPerPacket_)
- */
+    //int numDisplay;          //Number of times to display streaming information
+    //int numReadsPerDisplay;  //Number of packets to read before displaying streaming information
+    int readSizeMultiplier;  //Multiplier for the StreamData receive buffer size
+    int responseSize;        //The number of bytes in a StreamData response (differs with SamplesPerPacket_)
+  */
   int currChannel;// scanNumber;
   int recChars;//, backLog;
   uint16 voltageBytes, checksumTotal;
@@ -388,11 +312,7 @@ int LabjackClass::StreamData() //u6CalibrationInfo *caliInfo)
   //  {
   //      for( j = 0; j < numReadsPerDisplay; j++ )
   //      {
-  /* For USB StreamData, use Endpoint 3 for reads.  You can read the multiple
-   * StreamData responses of 64 bytes only if SamplesPerPacket_ is 25 to help
-   * improve streaming performance.  In this example this multiple is adjusted
-   * by the readSizeMultiplier variable.
-   */
+
 
   //Reading stream response from U6
   recChars = LJUSB_Stream(hDevice_, recBuff, responseSize_*readSizeMultiplier_);
@@ -528,47 +448,47 @@ int LabjackClass::PrintLog(long t0,long tf)
 //Sends a StreamStop low-level command to stop streaming.
 int LabjackClass::StreamStop(void)
 {
-    uint8 sendBuff[2], recBuff[4];
-    int sendChars, recChars;
+  uint8 sendBuff[2], recBuff[4];
+  int sendChars, recChars;
 
-    sendBuff[0] = (uint8)(0xB0);  //Checksum8
-    sendBuff[1] = (uint8)(0xB0);  //Command byte
+  sendBuff[0] = (uint8)(0xB0);  //Checksum8
+  sendBuff[1] = (uint8)(0xB0);  //Command byte
 
-    //Sending command to U6
-    sendChars = LJUSB_Write(hDevice_, sendBuff, 2);
-    if( sendChars < 2 )
+  //Sending command to U6
+  sendChars = LJUSB_Write(hDevice_, sendBuff, 2);
+  if( sendChars < 2 )
     {
-        if( sendChars == 0 )
-            printf("Error : write failed (StreamStop).\n");
-        else
-            printf("Error : did not write all of the buffer (StreamStop).\n");
-        return -1;
+      if( sendChars == 0 )
+	printf("Error : write failed (StreamStop).\n");
+      else
+	printf("Error : did not write all of the buffer (StreamStop).\n");
+      return -1;
     }
 
-    //Reading response from U6
-    recChars = LJUSB_Read(hDevice_, recBuff, 4);
-    if( recChars < 4 )
+  //Reading response from U6
+  recChars = LJUSB_Read(hDevice_, recBuff, 4);
+  if( recChars < 4 )
     {
-        if( recChars == 0 )
-            printf("Error : read failed (StreamStop).\n");
-        else
-            printf("Error : did not read all of the buffer (StreamStop).\n");
-        return -1;
+      if( recChars == 0 )
+	printf("Error : read failed (StreamStop).\n");
+      else
+	printf("Error : did not read all of the buffer (StreamStop).\n");
+      return -1;
     }
 
-    if( normalChecksum8(recBuff, 4) != recBuff[0] )
+  if( normalChecksum8(recBuff, 4) != recBuff[0] )
     {
-        printf("Error : read buffer has bad checksum8 (StreamStop).\n");
-        return -1;
+      printf("Error : read buffer has bad checksum8 (StreamStop).\n");
+      return -1;
     }
 
-    if( recBuff[1] != (uint8)(0xB1) || recBuff[3] != (uint8)(0x00) )
+  if( recBuff[1] != (uint8)(0xB1) || recBuff[3] != (uint8)(0x00) )
     {
-        printf("Error : read buffer has wrong command bytes (StreamStop).\n");
-        return -1;
+      printf("Error : read buffer has wrong command bytes (StreamStop).\n");
+      return -1;
     }
 
-    if( recBuff[2] != 0 )
+  if( recBuff[2] != 0 )
     {
       unsigned int errorcode = (unsigned int)recBuff[2];
      
@@ -584,15 +504,103 @@ int LabjackClass::StreamStop(void)
       
     }
 
-    /*
-    //Reading left over data in stream endpoint.  Only needs to be done with firmwares
-    //less than 0.94.
-    uint8 recBuffS[64];
-    int recCharsS = 64;
-    printf("Reading left over data from stream endpoint.\n");
-    while( recCharsS > 0 )
-        recCharsS = LJUSB_Stream(hDevice_, recBuffS, 64);
-    */
+  /*
+  //Reading left over data in stream endpoint.  Only needs to be done with firmwares
+  //less than 0.94.
+  uint8 recBuffS[64];
+  int recCharsS = 64;
+  printf("Reading left over data from stream endpoint.\n");
+  while( recCharsS > 0 )
+  recCharsS = LJUSB_Stream(hDevice_, recBuffS, 64);
+  */
 
-    return 0;
+  return 0;
+}
+
+
+//Sends a ConfigIO low-level command to turn off timers/counters
+int LabjackClass::ConfigIO()
+{
+  uint8 sendBuff[16], recBuff[16];
+  uint16 checksumTotal;
+  int sendChars, recChars, i;
+
+  sendBuff[1] = (uint8)(0xF8);  //Command byte
+  sendBuff[2] = (uint8)(0x03);  //Number of data words
+  sendBuff[3] = (uint8)(0x0B);  //Extended command number
+
+  sendBuff[6] = 1;  //Writemask : Setting writemask for TimerCounterConfig (bit 0)
+
+  sendBuff[7] = 0;  //NumberTimersEnabled : Setting to zero to disable all timers.
+  sendBuff[8] = 0;  //CounterEnable: Setting bit 0 and bit 1 to zero to disable both counters
+  sendBuff[9] = 0;  //TimerCounterPinOffset
+
+  for( i = 10; i < 16; i++ )
+    sendBuff[i] = 0;   //Reserved
+  extendedChecksum(sendBuff, 16);
+
+  //Sending command to U6
+  if( (sendChars = LJUSB_Write(hDevice_, sendBuff, 16)) < 16 )
+    {
+      if( sendChars == 0 )
+	printf("ConfigIO error : write failed\n");
+      else
+	printf("ConfigIO error : did not write all of the buffer\n");
+      return -1;
+    }
+
+  //Reading response from U6
+  if( (recChars = LJUSB_Read(hDevice_, recBuff, 16)) < 16 )
+    {
+      if( recChars == 0 )
+	printf("ConfigIO error : read failed\n");
+      else
+	printf("ConfigIO error : did not read all of the buffer\n");
+      return -1;
+    }
+
+  checksumTotal = extendedChecksum16(recBuff, 15);
+  if( (uint8)((checksumTotal / 256 ) & 0xff) != recBuff[5] )
+    {
+      printf("ConfigIO error : read buffer has bad checksum16(MSB)\n");
+      return -1;
+    }
+
+  if( (uint8)(checksumTotal & 0xff) != recBuff[4] )
+    {
+      printf("ConfigIO error : read buffer has bad checksum16(LSB)\n");
+      return -1;
+    }
+
+  if( extendedChecksum8(recBuff) != recBuff[0] )
+    {
+      printf("ConfigIO error : read buffer has bad checksum8\n");
+      return -1;
+    }
+
+  if( recBuff[1] != (uint8)(0xF8) || recBuff[2] != (uint8)(0x05) || recBuff[3] != (uint8)(0x0B) )
+    {
+      printf("ConfigIO error : read buffer has wrong command bytes\n");
+      return -1;
+    }
+
+  if( recBuff[6] != 0 )
+    {
+      printf("ConfigIO error : read buffer received errorcode %d\n", recBuff[6]);
+      return -1;
+    }
+
+  if( recBuff[8] != 0 )
+    {
+      printf("ConfigIO error : NumberTimersEnabled was not set to 0\n");
+      return -1;
+    }
+
+  if( recBuff[9] != 0 )
+    {
+      printf("ConfigIO error : CounterEnable was not set to 0\n");
+      return -1;
+    }
+
+  return 0;
 }

@@ -27,17 +27,23 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
+
   int i,j;
-  LabjackClass lj;
+  LabjackClass lj(6,25);
   long startTime, endTime;
 
   int numDisplay;          //Number of times to display streaming information
   int numReadsPerDisplay;  //Number of packets to read before displaying streaming information
 
-  numDisplay = 6;
-  numReadsPerDisplay = 24;
-    
-  if( lj.StreamConfig() != 0 )
+  numDisplay = 100;
+  numReadsPerDisplay = 1;
+   
+  uint16 scanInterval = 4000;
+  uint8 ResolutionIndex = 0x01;
+  uint8 SettlingFactor = 0x00;
+  uint8 ScanConfig = 0x00;
+
+  if( lj.StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig ) != 0 )
     {
       cout << "Error in  StreamConfig_example." << endl;
       exit(0);

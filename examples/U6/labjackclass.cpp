@@ -109,10 +109,11 @@ int LabjackClass::StreamConfig(uint16 scanInterval, uint8 ResolutionIndex,
 
   for( i = 0; i < NumChannels_; i++ )
     {
-      sendBuff[14 + i*2] = i;  //ChannelNumber (Positive) = i
-      sendBuff[15 + i*2] = 0;  //ChannelOptions: 
-      //  Bit 7: Differential = 0
-      //  Bit 5-4: GainIndex = 0 (+-10V)
+      sendBuff[14 + i*2] = i;     //ChannelNumber (Positive) = i
+      sendBuff[15 + i*2] = 0x00;  //ChannelOptions: 
+                                  // Bit 7: Differential = 0
+                                  // Bit 5-4: GainIndex = 0 (+-10V)
+                                  // E.g., Gain 10 in differential mode: 0x90
     }
 
   extendedChecksum(sendBuff, sendBuffSize);
@@ -244,7 +245,7 @@ int LabjackClass::InitStreamData()
    * improve streaming performance.  In this example this multiple is adjusted
    * by the readSizeMultiplier variable.
    */
-  readSizeMultiplier_ = 5;
+  readSizeMultiplier_ = NumChannels_*2;
 
 
   responseSize_ = 14 + SamplesPerPacket_*2;
@@ -384,6 +385,7 @@ int LabjackClass::StreamData() //u6CalibrationInfo *caliInfo)
 
       backLog_ = (int)recBuff[m*48 + 12 + SamplesPerPacket_*2];
 
+      // 
       for( k = 12; k < (12 + SamplesPerPacket_*2); k += 2 )
 	{
 	  voltageBytes = (uint16)recBuff[m*recBuffSize_ + k] + (uint16)recBuff[m*recBuffSize_ + k+1]*256;

@@ -29,14 +29,14 @@ int main(int argc, char* argv[])
 {
 
   int i,j;
-  LabjackClass lj(6,25);
+  LabjackClass lj(3,25); // Numer of channels, SamplePacket size (25 for high speed)
   long startTime, endTime;
 
   int numDisplay;          //Number of times to display streaming information
   int numReadsPerDisplay;  //Number of packets to read before displaying streaming information
 
-  numDisplay = 100;
-  numReadsPerDisplay = 1;
+  numDisplay = 5;
+  numReadsPerDisplay = 100;
    
   uint16 scanInterval = 4000;
   uint8 ResolutionIndex = 0x01;

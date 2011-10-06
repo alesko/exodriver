@@ -23,27 +23,39 @@
 #include "labjackclass.h"
 #include <time.h>
 
+
 using namespace std;
 
 int main(int argc, char* argv[])
 {
 
   int i,j;
-  LabjackClass lj(4,25); // Numer of channels, SamplePacket size (25 for high speed)
+  int num_samples=25;
+  int num_channels=1;
+  if ( argc > 1)
+    num_channels=atoi(argv[1]);
+
+    
+  if ( argc > 2)
+    num_samples=atoi(argv[2]);
+
+    
+  
+  LabjackClass lj(num_channels,num_samples); // Number of channels, SamplePacket size (25 for high speed)
   long startTime, endTime;
 
   int numDisplay;          //Number of times to display streaming information
   int numReadsPerDisplay;  //Number of packets to read before displaying streaming information
 
   numDisplay = 5;
-  numReadsPerDisplay = 100;
+  numReadsPerDisplay = 10;
    
   uint16 scanInterval = 4000;
   uint8 ResolutionIndex = 0x01;
   uint8 SettlingFactor = 0x00;
   uint8 ScanConfig = 0x00;
 
-  if( lj.StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig ) != 0 )
+  if( lj.StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig, true, 10 ) != 0 )
     {
       cout << "Error in  StreamConfig_example." << endl;
       exit(0);

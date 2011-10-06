@@ -31,14 +31,26 @@
 #include <stdio.h>
 
 
+
+
 class LabjackClass{
 
+
  public:
+
+  enum LJ_gain
+  {
+    G1  = 1,
+    G10 = 10
+  };
+
   LabjackClass(int num_ch, int samples);
   ~LabjackClass();
   int ConfigIO();
   int StreamConfig(uint16 scanInterval, uint8 ResolutionIndex, 
-		   uint8 SettlingFactor, uint8 ScanConfig);
+		   uint8 SettlingFactor, uint8 ScanConfig,
+		   bool differetialReading, int gain);
+
   int StreamStart();
   int InitStreamData();
   int StreamData();

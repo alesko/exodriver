@@ -55,6 +55,8 @@ LabjackClass::LabjackClass(int num_ch, int samples)
 
   cout << "USB connection opened." << endl;
   
+  PrintConfigU6();
+
   //Getting calibration information from U6
   if( getCalibrationInfo(hDevice_, &caliInfo_) < 0 )
     {
@@ -519,6 +521,103 @@ int LabjackClass::StreamStop(void)
   return 0;
 }
 
+//Sends a Feedback low-level command that configures digital directions,
+
+int LabjackClass::SetDO(uint8 fio, uint8 eio, uint8 cio) 
+{
+  uint8 sendBuff[14], recBuff[10]; //
+    int sendChars, recChars;
+    int len= 14;
+    int r_len= 10;
+    uint16 binVoltage16, checksumTotal;
+    uint8 state;
+
+    sendBuff[1] = (uint8)(0xF8);  //Command byte
+    //sendBuff[2] = 11;             //Number of data words (.5 word for echo, 10.5
+                                  //words for IOTypes and data)
+    sendBuff[2] = 0x04;             //Number of data words 
+
+    sendBuff[3] = (uint8)(0x00);  //Extended command number
+    sendBuff[6] = 0;     //Echo
+
+
+    // Set digital out
+    sendBuff[7]  = 0x1B; //27;  // Changed to 11 = BitStateWrite 
+    sendBuff[8]  = 0xFF; // WriteMask determine if the corresponding bit shouldf be updated
+    sendBuff[9]  = 0xFF;
+    sendBuff[10] = 0xFF;
+    sendBuff[11] = fio;
+    sendBuff[12] = eio;
+    sendBuff[13] = cio;
+
+    /*    // Read the analog input
+    sendBuff[14] = 0x02;
+    sendBuff[15] = 0x00; // Positive Channel
+    sendBuff[16] = 0x00; // Bit 0-3: Resolution Index
+                         // Bit 4-7: GainIndex
+    sendBuff[17] = 0x00; // Bit 0-2: Settling factor
+                         // Bit 7:   Differetial
+			 */
+    extendedChecksum(sendBuff, len);
+
+    //Sending command to U6
+    if( (sendChars = LJUSB_BulkWrite(hDevice_, U6_PIPE_EP1_OUT, sendBuff, len)) < len)
+    {
+        if(sendChars == 0)
+            printf("Feedback setup error : write failed");
+        else
+            printf("Feedback setup error : did not write all of the buffer");
+        return -1;
+    }
+
+    //Reading response from U6
+    if( (recChars = LJUSB_BulkRead(hDevice_, U6_PIPE_EP2_IN, recBuff, r_len)) < r_len)
+    {
+        if(recChars == 0)
+        {
+            printf("Feedback setup error : read failed");
+            return -1;
+        }
+        else
+	  {
+            //printf("Feedback setup error : did not read all of the buffer");
+	  }
+    }
+
+    checksumTotal = extendedChecksum16(recBuff, r_len);
+    if( (uint8)((checksumTotal / 256 ) & 0xff) != recBuff[5])
+    {
+      printf("Feedback setup error : read buffer has bad checksum16(MSB)");
+        return -1;
+    }
+
+    if( (uint8)(checksumTotal & 0xff) != recBuff[4])
+    {
+        printf("Feedback setup error : read buffer has bad checksum16(LBS)");
+        return -1;
+    }
+
+    if( extendedChecksum8(recBuff) != recBuff[0])
+    {
+        printf("Feedback setup error : read buffer has bad checksum8");
+        return -1;
+    }
+
+    if( recBuff[1] != (uint8)(0xF8) || recBuff[2] != 2 || recBuff[3] != (uint8)(0x00) )
+    {
+        printf("Feedback setup error : read buffer has wrong command bytes ");
+        return -1;
+    }
+
+    if( recBuff[6] != 0)
+    {
+        printf("Feedback setup error : received errorcode %d for frame %d in Feedback response. ", recBuff[6], recBuff[7]);
+        return -1;
+    }
+
+    return 0;
+}
+
 
 //Sends a ConfigIO low-level command to turn off timers/counters
 int LabjackClass::ConfigIO()
@@ -606,3 +705,105 @@ int LabjackClass::ConfigIO()
 
   return 0;
 }
+
+
+//Sends a ConfigU3 low-level command to read back configuration settings
+int LabjackClass::PrintConfigU6()
+{
+  uint8 sendBuff[26];
+  uint8 recBuff[38];
+  uint16 checksumTotal;
+  int sendChars, recChars, i;
+
+  sendBuff[1] = (uint8)(0xF8);  //Command byte
+  sendBuff[2] = (uint8)(0x0A);  //Number of data words
+  sendBuff[3] = (uint8)(0x08);  //Extended command number
+
+  //Setting all bytes to zero since we only want to read back the U6
+  //configuration settings
+  for( i = 6; i < 26; i++ )
+    sendBuff[i] = 0;
+
+  /* The commented out code below sets the U6's local ID to 3.  After setting
+     the local ID, reset the device for this change to take effect. */
+
+  //sendBuff[6] = 8;  //WriteMask : setting bit 3
+  //sendBuff[8] = 3;  //LocalID : setting local ID to 3
+
+  extendedChecksum(sendBuff, 26);
+
+  //Sending command to U6
+  if( (sendChars = LJUSB_Write(hDevice_, sendBuff, 26)) < 26 )
+    {
+      if( sendChars == 0 )
+	printf("ConfigU6 error : write failed\n");
+      else
+	printf("ConfigU6 error : did not write all of the buffer\n");
+      return -1;
+    }
+
+  //Reading response from U6
+  if( (recChars = LJUSB_Read(hDevice_, recBuff, 38)) < 38 )
+    {
+      if( recChars == 0 )
+	printf("ConfigU6 error : read failed\n");
+      else
+	printf("ConfigU6 error : did not read all of the buffer\n");
+      return -1;
+    }
+
+  checksumTotal = extendedChecksum16(recBuff, 38);
+  if( (uint8)((checksumTotal / 256) & 0xff) != recBuff[5] )
+    {
+      printf("ConfigU6 error : read buffer has bad checksum16(MSB)\n");
+      return -1;
+    }
+
+  if( (uint8)(checksumTotal & 0xff) != recBuff[4] )
+    {
+      printf("ConfigU6 error : read buffer has bad checksum16(LBS)\n");
+      return -1;
+    }
+
+  if( extendedChecksum8(recBuff) != recBuff[0] )
+    {
+      printf("ConfigU6 error : read buffer has bad checksum8\n");
+      return -1;
+    }
+
+  if( recBuff[1] != (uint8)(0xF8) || recBuff[2] != (uint8)(0x10) || recBuff[3] != (uint8)(0x08) )
+    {
+      printf("ConfigU6 error : read buffer has wrong command bytes\n");
+      return -1;
+    }
+
+  if( recBuff[6] != 0 )
+    {
+      printf("ConfigU6 error : read buffer received errorcode %d\n", recBuff[6]);
+      return -1;
+    }
+
+  printf("U6 Configuration Settings:\n");
+  //  printf("FirmwareVersion: %.3f\n", recBuff[10] + recBuff[9]/100.0);
+  printf("  FirmwareVersion = %d.%02d\n", recBuff[10], recBuff[9]);
+  //  printf("BootloaderVersion: %.3f\n", recBuff[12] + recBuff[11]/100.0);
+   printf("  BootloaderVersion = %d.%02d\n", recBuff[12], recBuff[11]);
+  //  printf("HardwareVersion: %.3f\n", recBuff[14] + recBuff[13]/100.0);
+  printf("  HardwareVersion = %d.%02d\n", recBuff[14], recBuff[13]);
+  printf("  SerialNumber: %u\n", recBuff[15] + recBuff[16]*256 + recBuff[17]*65536 + recBuff[18]*16777216);
+  printf("  ProductID: %d\n", recBuff[19] + recBuff[20]*256);
+  printf("  LocalID: %d\n", recBuff[21]);
+  printf("  Version Info: %d\n", recBuff[37]);
+  
+  if( recBuff[37] == 4 ){
+    printf("  DeviceName = U6\n");
+    pro_ = false;
+  }
+  else if(recBuff[37] == 12) {
+    printf("  DeviceName = U6-Pro\n");
+    pro_ = true;
+  }
+
+  return 0;
+}
+

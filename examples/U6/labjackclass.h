@@ -45,6 +45,8 @@ class LabjackClass{
   int StreamStop();
   int PrintLog(long t0,long tf);
   int PrintBuffer();
+  int PrintConfigU6();
+  int SetDO(uint8 fio, uint8 eio, uint8 cio);
    
  private:
   uint8 NumChannels_;        //For this example to work proper, SamplesPerPacket needs
@@ -60,6 +62,7 @@ class LabjackClass{
   HANDLE hDevice_;
   u6CalibrationInfo caliInfo_;
 
+  bool pro_; // Is it a U6 pro or not?
 
 /*
   int recChars_, backLog_;

@@ -5,6 +5,9 @@ U6CLASS_CSRC=u6.c
 U6CLASS_CPPSRC=labjackclass.cpp labjackclass_main.cpp
 U6CLASS_OBJ=$(U6CLASS_CPPSRC:.cpp=.o) $(U6CLASS_CSRC:.c=.o)
 
+U6GRAPH_CPPSRC=labjackclass.cpp graph.cpp
+U6GRAPH_OBJ=$(U6GRAPH_CPPSRC:.cpp=.o) $(U6CLASS_CSRC:.c=.o)
+
 U6ALLIO_SRC=u6allio.c u6.c
 U6ALLIO_OBJ=$(U6ALLIO_SRC:.c=.o)
 
@@ -29,17 +32,22 @@ U6LJTDAC_OBJ=$(U6LJTDAC_SRC:.c=.o)
 SRCS=$(wildcard *.c)
 HDRS=$(wildcard *.h)
 
-CFLAGS +=-Wall -g
-LIBS=-lm -llabjackusb
+CFLAGS +=-Wall -g -I/usr/X11R6/include
+LIBS=-lm -llabjackusb -L/usr/X11R6/lib -lGL -lGLU -lglut
 
 CPP = g++
 
-all: u6BasicConfigU6 u6ConfigU6 u6allio u6EFunctions u6Feedback u6Stream u6LJTDAC u6LabjackClass
+all: u6BasicConfigU6 u6ConfigU6 u6allio u6EFunctions u6Feedback u6Stream u6LJTDAC u6LabjackClass u6Graph
 
 u6LabjackClass: $(U6CLASS_OBJ)
 	$(CC) -c $(U6CLASS_CSRC)
 	$(CPP) -c $(U6CLASS_CPPSRC)
 	$(CPP) -o u6LabjackClass $(U6CLASS_OBJ) $(LDFLAGS) $(LIBS)
+
+u6Graph: $(U6CLASS_OBJ)
+	$(CC) -c $(U6CLASS_CSRC)
+	$(CPP) -c $(U6GRAPH_CPPSRC)
+	$(CPP) -o u6Graph $(U6GRAPH_OBJ) $(LDFLAGS) $(LIBS)
 
 
 u6BasicConfigU6: $(U6BASICCONFIGU6_OBJ)

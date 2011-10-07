@@ -111,7 +111,7 @@ int LabjackClass::StreamConfig(uint16 scanInterval, uint8 ResolutionIndex,
   sendBuff[12] = (uint8)(scanInterval&(0x00FF));  //scan interval (low byte)
   sendBuff[13] = (uint8)(scanInterval/256);       //scan interval (high byte)
 
-  if( differetialReading )
+  if( differetialReading == true )
     {
       for( i = 0; i < NumChannels_; i++ )
 	{
@@ -263,7 +263,7 @@ int LabjackClass::InitStreamData()
    * improve streaming performance.  In this example this multiple is adjusted
    * by the readSizeMultiplier variable.
    */
-  readSizeMultiplier_ = NumChannels_*2;
+  readSizeMultiplier_ = 1; //NumChannels_*2;
 
 
   responseSize_ = 14 + SamplesPerPacket_*2;
@@ -279,6 +279,7 @@ int LabjackClass::InitStreamData()
   
 
   voltages_.resize(stream_data_response_size);
+  cout << "stream_data_response_size:" << stream_data_response_size << endl;
   for (int i = 0; i < stream_data_response_size; ++i)
     voltages_[i].resize(NumChannels_);
 
@@ -434,6 +435,11 @@ int LabjackClass::StreamData() //u6CalibrationInfo *caliInfo)
 
   return 0;
 
+}
+
+std::vector< std::vector<double> > LabjackClass::GetData()
+{
+  return voltages_;
 }
 
 int LabjackClass::PrintBuffer()

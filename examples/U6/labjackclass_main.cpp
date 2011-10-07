@@ -22,7 +22,7 @@
 
 #include "labjackclass.h"
 #include <time.h>
-
+#include <string.h>
 
 using namespace std;
 
@@ -32,12 +32,34 @@ int main(int argc, char* argv[])
   int i,j;
   int num_samples=25;
   int num_channels=1;
-  if ( argc > 1)
-    num_channels=atoi(argv[1]);
 
-    
-  if ( argc > 2)
-    num_samples=atoi(argv[2]);
+  bool diff = false;
+
+  for(int i = 1; i < argc; i++)
+    {
+      if( 0 == strcmp(argv[i], "-s"))
+	{
+	  if (argv[i+1] != NULL )
+	    {
+	      std::cout << "number of samples/package" << atof(argv[i+1]) << std::endl;
+	      num_samples = atof(argv[i+1]);
+	    }
+	}
+      if( 0 == strcmp(argv[i], "-c"))
+	{
+	  if (argv[i+1] != NULL )
+	    {
+	      std::cout << "Number of channels:" << atof(argv[i+1]) << std::endl;
+	       num_channels = atof(argv[i+1]);
+	    }
+	}
+     if( 0 == strcmp(argv[i], "-d"))
+	{
+	  diff = true;
+	  std::cout << "Differential channels" << std::endl;
+	}
+
+    }
 
     
   
@@ -47,15 +69,15 @@ int main(int argc, char* argv[])
   int numDisplay;          //Number of times to display streaming information
   int numReadsPerDisplay;  //Number of packets to read before displaying streaming information
 
-  numDisplay = 5;
-  numReadsPerDisplay = 10;
+  numDisplay = 10;
+  numReadsPerDisplay = 1;
    
   uint16 scanInterval = 4000;
   uint8 ResolutionIndex = 0x01;
   uint8 SettlingFactor = 0x00;
   uint8 ScanConfig = 0x00;
 
-  if( lj.StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig, true, 10 ) != 0 )
+  if( lj.StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig, diff, 10 ) != 0 )
     {
       cout << "Error in  StreamConfig_example." << endl;
       exit(0);
@@ -73,15 +95,34 @@ int main(int argc, char* argv[])
 
   startTime = getTickCount();
 
+  std::vector< std::vector<double> > data;
+  
+  lj.StreamData();
+  data = lj.GetData();
+  cout << "Size (samples):" << data.size() << endl;
+  cout << "Size channels:" << data[0].size() << endl;
+  
+  int k,l;
   for( i = 0; i < numDisplay; i++ )
   {
     for( j = 0; j < numReadsPerDisplay; j++ )
       {
 	lj.StreamData();
+	data = lj.GetData();
+	cout << "Size (samples):" << data.size() << endl;
+	cout << "Size channels:" << data[0].size() << endl;
+	for( k=0; k < data.size(); k++) 
+	  {
+	    for( l=0; l < data[k].size(); l++)
+	      {
+		cout << data[k][l] << "\t";
+	      }
+	    cout << endl;
+	  }
       }
-    lj.PrintBuffer();
+    //lj.PrintBuffer();
   }
-
+  
   endTime = getTickCount();
 
   lj.PrintLog(startTime,endTime);

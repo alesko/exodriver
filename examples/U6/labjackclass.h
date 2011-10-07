@@ -35,6 +35,8 @@
 
 class LabjackClass{
 
+ protected:
+  static LabjackClass  *instance_; // To make callback functions work
 
  public:
 
@@ -59,6 +61,7 @@ class LabjackClass{
   int PrintBuffer();
   int PrintConfigU6();
   int SetDO(uint8 fio, uint8 eio, uint8 cio);
+  std::vector< std::vector<double> > GetData();
    
  private:
   uint8 NumChannels_;        //For this example to work proper, SamplesPerPacket needs

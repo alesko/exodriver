@@ -34,6 +34,7 @@ HDRS=$(wildcard *.h)
 
 CFLAGS +=-Wall -g -I/usr/X11R6/include
 LIBS=-lm -llabjackusb -L/usr/X11R6/lib -lGL -lGLU -lglut
+GTKLIBS = `pkg-config --cflags --libs gtk+-2.0`
 
 CPP = g++
 
@@ -41,12 +42,12 @@ all: u6BasicConfigU6 u6ConfigU6 u6allio u6EFunctions u6Feedback u6Stream u6LJTDA
 
 u6LabjackClass: $(U6CLASS_OBJ)
 	$(CC) -c $(U6CLASS_CSRC)
-	$(CPP) -c $(U6CLASS_CPPSRC)
+	$(CPP) -c $(U6CLASS_CPPSRC) 
 	$(CPP) -o u6LabjackClass $(U6CLASS_OBJ) $(LDFLAGS) $(LIBS)
 
 u6Graph: $(U6CLASS_OBJ)
 	$(CC) -c $(U6CLASS_CSRC)
-	$(CPP) -c $(U6GRAPH_CPPSRC)
+	$(CPP) -c $(U6GRAPH_CPPSRC) $(GTKLIBS)
 	$(CPP) -o u6Graph $(U6GRAPH_OBJ) $(LDFLAGS) $(LIBS)
 
 

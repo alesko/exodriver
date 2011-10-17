@@ -24,6 +24,8 @@
 #include <time.h>
 #include <string.h>
 
+#include <gtk/gtk.h>
+
 //TapoMeter *tap_counter;  // Global variable 
 
 /* OpenGL includes */
@@ -41,9 +43,33 @@ using namespace std;
 
 
 LabjackClass *Glj;//(num_channels,num_samples);
+std::vector<double> Gtime;
+std::vector<double> G_data_vec;
 
 int Gscreen_width_ = 640;
 int Gscreen_height_ = 480;
+int Gzoom = 1000;
+
+double GetRunTime(void)
+{
+   double sec = 0;
+   struct timeval tp;
+
+   gettimeofday(&tp,NULL);
+   sec = tp.tv_sec + tp.tv_usec / 1000000.0;
+
+   return(sec);
+}
+
+void ZoomIn()
+{
+  Gzoom = Gzoom + 100;
+}
+
+void ZoomOut()
+{
+  Gzoom = Gzoom - 100;
+}
 
 void HandleKeyboard(unsigned char key,int x, int y)
 {
@@ -82,9 +108,11 @@ void HandleMenu(int selection)
   switch(selection)
     {
     case(1):
+      ZoomIn();
       //tap_counter->increase_c_();
       break;
     case(2):
+      ZoomOut();
       //tap_counter->decrease_c_();
       break;
     case(3):
@@ -106,8 +134,8 @@ void CreateMenu(void)
   int main_menu;
   
   main_menu = glutCreateMenu(HandleMenu);
-  glutAddMenuEntry("Increase threshold",1);
-  glutAddMenuEntry("Decrease threshold",2);
+  glutAddMenuEntry("Zoom in",1);
+  glutAddMenuEntry("Zoom out",2);
   glutAddMenuEntry("Increase factor",3);
   glutAddMenuEntry("Decrease factor",4);
   glutAddMenuEntry("Quit",10);
@@ -146,25 +174,25 @@ void HandleReshape(int w,int h)
 int DrawPlot(std::vector<double> data,double color[3], double t1, double t2){//,color,maximum)
   //screenWidth=1280; screenHeight=960;
   //maximum = 
-  int len = 100; //data_.size();
+  int len = data.size(); //data_.size();
   int i = 0;
   int s = 0;
   int x=0;
-  int zoom=5000;
+  //int zoom=1000;
 
   glLineWidth(1);
   
  
   glBegin(GL_LINES);
   glColor3f(1.0, 1.0, 1.0);
-  glVertex2f(0, Gscreen_height_-zoom*t1);
-  glVertex2f(Gscreen_width_, Gscreen_height_-zoom*t1);
+  glVertex2f(0, Gscreen_height_-Gzoom*t1);
+  glVertex2f(Gscreen_width_, Gscreen_height_-Gzoom*t1);
   glEnd();
 
   glBegin(GL_LINES);
   glColor3f(0.0, 1.0, 0.0);
-  glVertex2f(0,Gscreen_height_-zoom*t2);
-  glVertex2f(Gscreen_width_,Gscreen_height_-zoom*t2);
+  glVertex2f(0,Gscreen_height_-Gzoom*t2);
+  glVertex2f(Gscreen_width_,Gscreen_height_-Gzoom*t2);
   glEnd();
 
   if( len > Gscreen_width_ )
@@ -172,7 +200,7 @@ int DrawPlot(std::vector<double> data,double color[3], double t1, double t2){//,
   glBegin(GL_LINE_STRIP);
   glColor3f(color[0], color[1], color[2]);
   for(i=0;i < len; i++){
-    glVertex2f(i,Gscreen_height_-zoom*data[x]);
+    glVertex2f(i,Gscreen_height_-Gzoom*data[x]);
     x++;
   }
   glEnd();
@@ -182,7 +210,7 @@ int DrawPlot(std::vector<double> data,double color[3], double t1, double t2){//,
 
 
 // Called by GLUT when the screen needs to be redrawn 
-void DoRedraw() //int flag, std::vector<double> d,double t1, double t2)
+void DoRedraw(std::vector<double> d,double t1, double t2)
 {
 
   // Setup the display 
@@ -201,7 +229,7 @@ void DoRedraw() //int flag, std::vector<double> d,double t1, double t2)
   double green[3]={0.0, 1.0, 0.0};
   double blue[3]={0.0, 0.0, 1.0};
 
-  //    DrawPlot(d,red, t1,t2);
+  DrawPlot(d,red, t1,t2);
   glFlush();
   glutSwapBuffers();
 
@@ -215,21 +243,37 @@ void IsRunning(void)
   else
     exit(0);
   */
+  int buffersize = 1000;
   std::vector< std::vector<double> > data;
 
   int k,l;
   Glj->StreamData();
   data = Glj->GetData();
+  
   for( k=0; k < data.size(); k++) 
     {
       for( l=0; l < data[k].size(); l++)
 	{
-	  cout << data[k][l] << "\t";
+	  Gtime.push_back(GetRunTime());
+	  G_data_vec.push_back(data[0][l]); // Fix number of channels
+	  if( G_data_vec.size() > buffersize )
+	    {
+	      // Remove values if vector is too long
+	      G_data_vec.erase(G_data_vec.begin());//	temp1_vec_.pop_front();
+	      Gtime.erase(Gtime.begin());//
+	    }
+	  //DoRedraw(G_data_vec,double t1, double t2)
+	  //cout << data[k][l] << "\t";
 	}
-      cout << endl;
+      //cout << endl;
     }
-  usleep(1000);
-  DoRedraw();
+  usleep(10);
+  if( Gtime.size() != G_data_vec.size() )
+    cout << "ERROR in datasize" << endl;
+  for( k=0; k < data.size(); k++) 
+    {
+    }
+  DoRedraw(G_data_vec,Gtime[0], Gtime[buffersize-1]);
 }
 
 int main(int argc, char* argv[])

@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
   uint8 SettlingFactor = 0x00;
   uint8 ScanConfig = 0x00;
 
-  if( lj.StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig, diff, 10 ) != 0 )
+  if( lj.StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig, diff, 1 ) != 0 )
     {
       cout << "Error in  StreamConfig_example." << endl;
       exit(0);

@@ -280,9 +280,10 @@ int LabjackClass::InitStreamData()
   scanNumber_ = 0;
   totalScanNumber_=0;
 
-  bufferSize_ =  1;
+  
   //double voltages[(SamplesPerPacket_/NumChannels_)*readSizeMultiplier*numReadsPerDisplay*numDisplay][NumChannels_];
   int stream_data_response_size = (SamplesPerPacket_/NumChannels_)*readSizeMultiplier_; //*numReadsPerDisplay*numDisplay;
+  bufferSize_ =  stream_data_response_size;
   //std::vector< std::vector<double> > 
   //voltages_(stream_data_response_size, std::vector<double> (NumChannels_));
   //voltages_.get_allocator().allocate(, std::vector<double> (NumChannels_));
@@ -428,7 +429,7 @@ int LabjackClass::StreamData() //u6CalibrationInfo *caliInfo)
 	      scanNumber_++;
 	      totalScanNumber_++;
 	    }
-	  if(scanNumber_ > bufferSize_)
+	  if(scanNumber_ >= bufferSize_)
 	    scanNumber_ = 0;
 	}
 

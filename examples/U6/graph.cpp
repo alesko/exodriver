@@ -49,6 +49,7 @@ std::vector<double> G_data_vec;
 int Gscreen_width_ = 640;
 int Gscreen_height_ = 480;
 int Gzoom = 1000;
+float Gyamp = 10.0;
 
 double GetRunTime(void)
 {
@@ -70,6 +71,29 @@ void ZoomOut()
 {
   Gzoom = Gzoom - 100;
 }
+
+void ZoomOutYamp()
+{
+  if( Gyamp >= 1.0)
+    Gyamp = Gyamp + 1.0;
+  else
+    Gyamp = Gyamp + 0.1;
+  printf("Yamp: %f\n",Gyamp);
+  
+}
+
+void ZoomInYamp()
+{
+  if( Gyamp > 1.0)
+    Gyamp = Gyamp - 1.0;
+  else
+    {
+      Gyamp = Gyamp - 0.1;
+    }
+  printf("Yamp: %f\n",Gyamp);
+}
+
+
 
 void HandleKeyboard(unsigned char key,int x, int y)
 {
@@ -108,11 +132,13 @@ void HandleMenu(int selection)
   switch(selection)
     {
     case(1):
-      ZoomIn();
+      //ZoomIn();
+      ZoomInYamp();
       //tap_counter->increase_c_();
       break;
     case(2):
-      ZoomOut();
+      //ZoomOut();
+      ZoomOutYamp();
       //tap_counter->decrease_c_();
       break;
     case(3):
@@ -166,8 +192,10 @@ void HandleIdle(void)
 
 void HandleReshape(int w,int h)
 {
-  Gscreen_width_ = 640;
-  Gscreen_height_ = 480;
+  //Gscreen_width_ = 640;
+  //Gscreen_height_ = 480;
+  Gscreen_width_ = w;
+  Gscreen_height_ = h;
 }
 
 
@@ -182,7 +210,37 @@ int DrawPlot(std::vector<double> data,double color[3], double t1, double t2){//,
 
   glLineWidth(1);
   
- 
+  // x axis
+  glBegin(GL_LINES);
+  glColor3f(0.0, 0.0, 0.0);
+  glVertex2f(10,(GLint)((GLfloat)Gscreen_height_*0.5));
+  glVertex2f(Gscreen_width_-10, (GLint)((GLfloat)Gscreen_height_*0.5));
+  glEnd();
+
+  // Y axis
+  glBegin(GL_LINES);
+  glColor3f(0.0, 0.0, 0.0);
+  glVertex2f(10, 10);
+  glVertex2f(10, Gscreen_height_-10 );
+  glEnd();
+
+  GLfloat hy = (Gscreen_height_-10)*0.5;
+  
+  glBegin(GL_LINES);
+  glColor3f(0.0, 0.0, 0.0);
+  if(Gyamp > 1.0)
+    {
+      for(i=(int)-Gyamp;i <= Gyamp; i++){
+	//glVertex2f(i,Gscreen_height_-Gzoom*data[x]);
+	/*glVertex2f(5, -i*Gyamp*hy+Gscreen_height_*0.5);
+	glVertex2f(15, -i/5.0*Gyamp/5.0*hy+Gscreen_height_*0.5);
+	glVertex2f(5, i/5.0*Gyamp/5.0*hy+Gscreen_height_*0.5);
+	glVertex2f(15, i/5.0*Gyamp/5.0*hy+Gscreen_height_*0.5);*/
+      }
+    }
+  glEnd();
+  
+  /* 
   glBegin(GL_LINES);
   glColor3f(1.0, 1.0, 1.0);
   glVertex2f(0, Gscreen_height_-Gzoom*t1);
@@ -194,13 +252,16 @@ int DrawPlot(std::vector<double> data,double color[3], double t1, double t2){//,
   glVertex2f(0,Gscreen_height_-Gzoom*t2);
   glVertex2f(Gscreen_width_,Gscreen_height_-Gzoom*t2);
   glEnd();
-
+*/
+  
   if( len > Gscreen_width_ )
       x = len - Gscreen_width_;
   glBegin(GL_LINE_STRIP);
   glColor3f(color[0], color[1], color[2]);
+  
   for(i=0;i < len; i++){
-    glVertex2f(i,Gscreen_height_-Gzoom*data[x]);
+    //glVertex2f(i,Gscreen_height_-Gzoom*data[x]);
+    glVertex2f(i, -data[i]/Gyamp*hy+Gscreen_height_*0.5);
     x++;
   }
   glEnd();
@@ -243,7 +304,7 @@ void IsRunning(void)
   else
     exit(0);
   */
-  int buffersize = 1000;
+  int buffersize = Gscreen_width_-20;
   std::vector< std::vector<double> > data;
 
   int k,l;
@@ -325,8 +386,9 @@ int main(int argc, char* argv[])
   uint8 ResolutionIndex = 0x01;
   uint8 SettlingFactor = 0x00;
   uint8 ScanConfig = 0x00;
+  int gain=1;
 
-  if( Glj->StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig, diff, 10 ) != 0 )
+  if( Glj->StreamConfig(scanInterval, ResolutionIndex, SettlingFactor, ScanConfig, diff, gain ) != 0 )
     {
       cout << "Error in  StreamConfig_example." << endl;
       exit(0);
